@@ -3,7 +3,7 @@
 
 set -ev
 
-SUDO=${SUDO:=sudo} # SUDO=command in docker (running as root, sudo not available)
+SUDO=command # SUDO=command in docker (running as root, sudo not available)
 if [ "$1" == "assume-yes" ]; then
     APT_CONFIRM="--assume-yes"
 else
@@ -15,7 +15,7 @@ deps=(
     xorg-dev
     libxcb-shm0
     libglu1-mesa-dev
-    python3-dev
+    python3.8-dev
     # Filament build-from-source
     clang
     libc++-dev

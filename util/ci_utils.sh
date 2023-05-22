@@ -2,24 +2,18 @@
 set -euo pipefail
 
 # The following environment variables are required:
-SUDO=${SUDO:=sudo}
+SUDO=command
 UBUNTU_VERSION=${UBUNTU_VERSION:="$(lsb_release -cs 2>/dev/null || true)"} # Empty in macOS
 
-DEVELOPER_BUILD="${DEVELOPER_BUILD:-ON}"
+DEVELOPER_BUILD=OFF
 if [[ "$DEVELOPER_BUILD" != "OFF" ]]; then # Validate input coming from GHA input field
     DEVELOPER_BUILD="ON"
 fi
-BUILD_SHARED_LIBS=${BUILD_SHARED_LIBS:-OFF}
-NPROC=${NPROC:-$(getconf _NPROCESSORS_ONLN)} # POSIX: MacOS + Linux
-if [ -z "${BUILD_CUDA_MODULE:+x}" ]; then
-    if [[ "$OSTYPE" == "linux-gnu"* ]]; then
-        BUILD_CUDA_MODULE=ON
-    else
-        BUILD_CUDA_MODULE=OFF
-    fi
-fi
-BUILD_TENSORFLOW_OPS=${BUILD_TENSORFLOW_OPS:-ON}
-BUILD_PYTORCH_OPS=${BUILD_PYTORCH_OPS:-ON}
+BUILD_SHARED_LIBS=OFF
+NPROC=1 # POSIX: MacOS + Linux
+BUILD_CUDA_MODULE=ON
+BUILD_TENSORFLOW_OPS=OFF
+BUILD_PYTORCH_OPS=ON
 LOW_MEM_USAGE=${LOW_MEM_USAGE:-OFF}
 
 # Dependency versions:
@@ -27,26 +21,26 @@ LOW_MEM_USAGE=${LOW_MEM_USAGE:-OFF}
 if [[ $BUILD_TENSORFLOW_OPS == ON || $BUILD_PYTORCH_OPS == ON ||
     $UBUNTU_VERSION != bionic ]]; then
     # CUDA version in sync with PyTorch and Tensorflow
-    CUDA_VERSION=("11-6" "11.6")
+    CUDA_VERSION=("11-3" "11.3")
     CUDNN_MAJOR_VERSION=8
-    CUDNN_VERSION="8.4.1.50_cuda11.6"
+    CUDNN_VERSION="8.9.1.23_cuda11.3"
     GCC_MAX_VER=9
 else
     # Without MLOps, ensure Open3D works with the lowest supported CUDA version
     # Not available in Nvidia focal repos
-    CUDA_VERSION=("10-1" "10.1")
+    CUDA_VERSION=("11-3" "11.3")
     CUDNN_MAJOR_VERSION=8
-    CUDNN_VERSION="8.0.5.39-1+cuda10.1"
+    CUDNN_VERSION="8.9.1.23+cuda11.3"
     GCC_MAX_VER=7
 fi
 # ML
-TENSORFLOW_VER="2.8.4"
-TENSORBOARD_VER="2.8.0"
-TORCH_CPU_GLNX_VER="1.13.1+cpu"
-TORCH_CUDA_GLNX_VER="1.13.1+cu116"
+#TENSORFLOW_VER="2.8.4"
+#TENSORBOARD_VER="2.8.0"
+TORCH_CPU_GLNX_VER="1.10.1+cpu"
+TORCH_CUDA_GLNX_VER="1.10.1+cu113"
 PYTHON_VER=$(python -c 'import sys; ver=f"{sys.version_info.major}{sys.version_info.minor}"; print(f"cp{ver}-cp{ver}{sys.abiflags}")' 2>/dev/null || true)
 # TORCH_CUDA_GLNX_URL="https://github.com/isl-org/open3d_downloads/releases/download/torch1.8.2/torch-1.8.2-${PYTHON_VER}-linux_x86_64.whl"
-TORCH_MACOS_VER="1.13.1"
+TORCH_MACOS_VER="1.10.1"
 TORCH_REPO_URL="https://download.pytorch.org/whl/torch/"
 # Python
 PIP_VER="21.1.1"
@@ -59,7 +53,7 @@ YAPF_VER="0.30.0"
 PROTOBUF_VER="3.19.0"
 
 OPEN3D_INSTALL_DIR=~/open3d_install
-OPEN3D_SOURCE_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")"/.. >/dev/null 2>&1 && pwd)"
+OPEN3D_SOURCE_ROOT=/workspace/boundary-segmentation/Open3D
 
 install_python_dependencies() {
 
@@ -93,17 +87,17 @@ install_python_dependencies() {
         python -m pip uninstall --yes "$TF_ARCH_DISABLE_NAME"
         python -m pip install -U "$TF_ARCH_NAME"=="$TENSORFLOW_VER"
     fi
-    if [ "$BUILD_PYTORCH_OPS" == "ON" ]; then
-        if [[ "$OSTYPE" == "linux-gnu"* ]]; then
-            python -m pip install -U "${TORCH_GLNX}" -f "$TORCH_REPO_URL"
+    #if [ "$BUILD_PYTORCH_OPS" == "ON" ]; then
+    #    if [[ "$OSTYPE" == "linux-gnu"* ]]; then
+    #        python -m pip install -U "${TORCH_GLNX}" -f "$TORCH_REPO_URL"
 
-        elif [[ "$OSTYPE" == "darwin"* ]]; then
-            python -m pip install -U torch=="$TORCH_MACOS_VER" -f "$TORCH_REPO_URL"
-        else
-            echo "unknown OS $OSTYPE"
-            exit 1
-        fi
-    fi
+#        elif [[ "$OSTYPE" == "darwin"* ]]; then
+#            python -m pip install -U torch=="$TORCH_MACOS_VER" -f "$TORCH_REPO_URL"
+#        else
+#            echo "unknown OS $OSTYPE"
+#            exit 1
+#        fi
+#    fi
     if [ "$BUILD_TENSORFLOW_OPS" == "ON" ] || [ "$BUILD_PYTORCH_OPS" == "ON" ]; then
         python -m pip install -U yapf=="$YAPF_VER"
         # Fix Protobuf compatibility issue
@@ -133,7 +127,7 @@ build_all() {
         -DDEVELOPER_BUILD=$DEVELOPER_BUILD
         -DBUILD_SHARED_LIBS="$BUILD_SHARED_LIBS"
         -DCMAKE_BUILD_TYPE=Release
-        -DBUILD_LIBREALSENSE=ON
+        -DBUILD_LIBREALSENSE=OFF
         -DBUILD_CUDA_MODULE="$BUILD_CUDA_MODULE"
         -DBUILD_COMMON_CUDA_ARCHS=ON
         -DBUILD_COMMON_ISPC_ISAS=ON
@@ -202,9 +196,9 @@ build_pip_package() {
         "-DDEVELOPER_BUILD=$DEVELOPER_BUILD"
         "-DBUILD_COMMON_ISPC_ISAS=ON"
         "-DBUILD_AZURE_KINECT=$BUILD_AZURE_KINECT"
-        "-DBUILD_LIBREALSENSE=ON"
+        "-DBUILD_LIBREALSENSE=OFF"
         "-DGLIBCXX_USE_CXX11_ABI=OFF"
-        "-DBUILD_TENSORFLOW_OPS=ON"
+        "-DBUILD_TENSORFLOW_OPS=OFF"
         "-DBUILD_PYTORCH_OPS=ON"
         "-DBUILD_FILAMENT_FROM_SOURCE=$BUILD_FILAMENT_FROM_SOURCE"
         "-DBUILD_JUPYTER_EXTENSION=$BUILD_JUPYTER_EXTENSION"
@@ -218,7 +212,7 @@ build_pip_package() {
     cmake -DBUILD_CUDA_MODULE=OFF "${cmakeOptions[@]}" ..
     set +x # Echo commands off
     echo
-    make VERBOSE=1 -j"$NPROC" pybind open3d_tf_ops open3d_torch_ops
+    make VERBOSE=1 -j"$NPROC" pybind open3d_torch_ops
 
     echo "Packaging Open3D CPU pip package..."
     make VERBOSE=1 -j"$NPROC" pip-package
